@@ -14,8 +14,7 @@ import {
   deleteDoc,
   updateDoc,
   query,
-  orderBy,
-  increment
+  orderBy
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ---- State ----
@@ -125,24 +124,47 @@ async function loadLogsForDate(date) {
   return logs;
 }
 
-async function addRep(exerciseId) {
+async function setReps(exerciseId, reps) {
   const dateStr = toDateStr(new Date());
-  const ref = logRef(dateStr, exerciseId);
-  await setDoc(ref, {
-    exerciseId,
-    date: dateStr,
-    reps: increment(1)
-  }, { merge: true });
+  await setDoc(logRef(dateStr, exerciseId), { exerciseId, date: dateStr, reps }, { merge: true });
+  todayLogs[exerciseId] = reps;
+}
 
-  todayLogs[exerciseId] = (todayLogs[exerciseId] || 0) + 1;
+function makeCountEditable(spanEl, exerciseId) {
+  const current = todayLogs[exerciseId] || 0;
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.inputMode = 'numeric';
+  input.min = '0';
+  input.value = current;
+  input.className = 'rep-input';
+  input.setAttribute('aria-label', 'Repeticiones');
+  spanEl.replaceWith(input);
+  input.focus();
+  input.select();
 
-  const countEl = document.querySelector(`[data-id="${exerciseId}"] .rep-count`);
-  if (countEl) {
-    countEl.textContent = todayLogs[exerciseId];
-    countEl.classList.remove('bump');
-    void countEl.offsetWidth;
-    countEl.classList.add('bump');
+  let saved = false;
+  async function save() {
+    if (saved) return;
+    saved = true;
+    const val = Math.max(0, parseInt(input.value) || 0);
+    await setReps(exerciseId, val);
+    const span = document.createElement('span');
+    span.className = 'rep-count';
+    span.textContent = val;
+    input.replaceWith(span);
+    span.addEventListener('click', () => makeCountEditable(span, exerciseId));
+    if (val !== current) {
+      span.classList.add('bump');
+      setTimeout(() => span.classList.remove('bump'), 300);
+    }
   }
+
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') { input.value = current; input.blur(); }
+  });
 }
 
 async function saveExercise(name, icon) {
@@ -185,13 +207,13 @@ function renderMain() {
       <button class="card-edit-btn" data-id="${ex.id}" aria-label="Editar">✏️</button>
       <div class="card-icon">${ex.icon || '🏃'}</div>
       <div class="card-name">${ex.name}</div>
-      <div class="rep-count">${todayLogs[ex.id] || 0}</div>
-      <button class="add-rep-btn" data-id="${ex.id}" aria-label="Agregar repetición">+</button>
+      <span class="rep-count">${todayLogs[ex.id] || 0}</span>
+      <span class="rep-hint">tocá para editar</span>
     </div>
   `).join('');
 
-  grid.querySelectorAll('.add-rep-btn').forEach(btn =>
-    btn.addEventListener('click', () => addRep(btn.dataset.id))
+  grid.querySelectorAll('.rep-count').forEach(span =>
+    span.addEventListener('click', () => makeCountEditable(span, span.closest('[data-id]').dataset.id))
   );
   grid.querySelectorAll('.card-edit-btn').forEach(btn =>
     btn.addEventListener('click', () => openEditModal(btn.dataset.id))
