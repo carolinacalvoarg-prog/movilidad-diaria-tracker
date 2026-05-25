@@ -23,6 +23,26 @@ let exercises = [];
 let todayLogs = {};
 let editingExerciseId = null;
 let historyDate = new Date();
+let userWeightKg = 74;
+
+// ---- Calorie estimation ----
+function getCalsPerRep(name) {
+  const n = name.toLowerCase();
+  if (/flexion|push.?up|fondos|lagartija/.test(n)) return 0.35;
+  if (/sentadill|squat|cuclill/.test(n))           return 0.28;
+  if (/caminat|paso|walk|step/.test(n))            return 0.04;
+  if (/abdomin|sit.?up|crunch/.test(n))            return 0.25;
+  if (/burpee/.test(n))                            return 1.43;
+  if (/plancha|plank/.test(n))                     return 0.15;
+  if (/salto|jump|estoca/.test(n))                 return 0.50;
+  if (/corr|run|trote/.test(n))                    return 0.08;
+  return 0.30;
+}
+
+function estimateCals(exerciseName, reps) {
+  const raw = getCalsPerRep(exerciseName) * reps * (userWeightKg / 70);
+  return Math.round(raw);
+}
 
 // ---- Date helpers ----
 function toDateStr(date) {
@@ -74,6 +94,16 @@ function logRef(dateStr, exerciseId) {
 }
 
 // ---- Data ----
+async function loadUserSettings() {
+  const ref = doc(db, 'users', uid, 'settings', 'profile');
+  const snap = await getDoc(ref);
+  if (snap.exists() && snap.data().weightKg) {
+    userWeightKg = snap.data().weightKg;
+  } else {
+    await setDoc(ref, { weightKg: userWeightKg });
+  }
+}
+
 async function loadExercises() {
   showLoading(true);
   try {
@@ -229,15 +259,44 @@ async function renderHistory() {
   list.innerHTML = `<div class="loading">Cargando...</div>`;
 
   const logs = await loadLogsForDate(historyDate);
-  const total = Object.values(logs).reduce((a, b) => a + b, 0);
+  const totalReps = Object.values(logs).reduce((a, b) => a + b, 0);
+  const totalCals = exercises.reduce((sum, ex) => sum + estimateCals(ex.name, logs[ex.id] || 0), 0);
+
+  const activeExercises = exercises.filter(ex => logs[ex.id] > 0);
+  const inactiveExercises = exercises.filter(ex => !logs[ex.id]);
 
   list.innerHTML = `
-    <div class="history-total">Total del día: <strong>${total}</strong> reps</div>
-    ${exercises.map(ex => `
-      <div class="history-item">
+    <div class="history-totals">
+      <div class="history-stat">
+        <span class="history-stat-value">${totalReps}</span>
+        <span class="history-stat-label">reps</span>
+      </div>
+      <div class="history-stat-divider"></div>
+      <div class="history-stat">
+        <span class="history-stat-value">${totalCals}</span>
+        <span class="history-stat-label">kcal estimadas</span>
+      </div>
+    </div>
+    ${activeExercises.map(ex => {
+      const cals = estimateCals(ex.name, logs[ex.id]);
+      return `
+        <div class="history-item">
+          <span class="history-icon">${ex.icon || '🏃'}</span>
+          <div class="history-info">
+            <span class="history-name">${ex.name}</span>
+            <span class="history-cals">~${cals} kcal</span>
+          </div>
+          <span class="history-count has-reps">${logs[ex.id]}</span>
+        </div>`;
+    }).join('')}
+    ${inactiveExercises.length && activeExercises.length ? '<div class="history-divider"></div>' : ''}
+    ${inactiveExercises.map(ex => `
+      <div class="history-item inactive">
         <span class="history-icon">${ex.icon || '🏃'}</span>
-        <span class="history-name">${ex.name}</span>
-        <span class="history-count ${logs[ex.id] ? 'has-reps' : ''}">${logs[ex.id] || 0}</span>
+        <div class="history-info">
+          <span class="history-name">${ex.name}</span>
+        </div>
+        <span class="history-count">0</span>
       </div>
     `).join('')}
   `;
@@ -335,6 +394,7 @@ onAuthStateChanged(auth, async user => {
   if (user) {
     uid = user.uid;
     showView('main');
+    await loadUserSettings();
     await loadExercises();
   } else {
     uid = null;
