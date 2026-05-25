@@ -1,4 +1,4 @@
-const CACHE = 'movilidad-v2';
+const CACHE = 'movilidad-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -23,10 +23,17 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Network-first: intenta red, cae a caché si offline
 self.addEventListener('fetch', e => {
   const url = e.request.url;
   if (url.includes('firebase') || url.includes('google') || url.includes('googleapis')) return;
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request)
+      .then(response => {
+        const copy = response.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
