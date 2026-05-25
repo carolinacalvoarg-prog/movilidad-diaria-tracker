@@ -47,6 +47,25 @@ function estimateCals(exerciseName, reps) {
   return Math.round(raw);
 }
 
+function getSecondsPerRep(name) {
+  const n = name.toLowerCase();
+  if (/flexion|push.?up|fondos|lagartija/.test(n))       return 3;
+  if (/sentadill|squat|cuclill/.test(n))                 return 3;
+  if (/estocad|lunge/.test(n))                           return 3;
+  if (/talon.*cola|cola.*talon|hamstring|curl/.test(n))  return 2;
+  if (/elevac.*talon|talon.*elevac|calf.?raise|pantorr/.test(n)) return 2;
+  if (/abdomin|sit.?up|crunch/.test(n))                  return 3;
+  if (/burpee/.test(n))                                  return 5;
+  if (/plancha|plank/.test(n))                           return 1;
+  if (/caminat|paso|walk|step/.test(n))                  return 1;
+  if (/corr|run|trote/.test(n))                          return 1;
+  return 2.5;
+}
+
+function estimateMinutes(exerciseName, reps) {
+  return getSecondsPerRep(exerciseName) * reps / 60;
+}
+
 // ---- Date helpers ----
 function toDateStr(date) {
   return date.toISOString().slice(0, 10);
@@ -264,6 +283,8 @@ async function renderHistory() {
   const logs = await loadLogsForDate(historyDate);
   const totalReps = Object.values(logs).reduce((a, b) => a + b, 0);
   const totalCals = exercises.reduce((sum, ex) => sum + estimateCals(ex.name, logs[ex.id] || 0), 0);
+  const totalMins = exercises.reduce((sum, ex) => sum + estimateMinutes(ex.name, logs[ex.id] || 0), 0);
+  const minsDisplay = totalMins < 1 ? '<1' : Math.round(totalMins);
 
   const activeExercises = exercises.filter(ex => logs[ex.id] > 0);
   const inactiveExercises = exercises.filter(ex => !logs[ex.id]);
@@ -277,17 +298,24 @@ async function renderHistory() {
       <div class="history-stat-divider"></div>
       <div class="history-stat">
         <span class="history-stat-value">${totalCals}</span>
-        <span class="history-stat-label">kcal estimadas</span>
+        <span class="history-stat-label">kcal</span>
+      </div>
+      <div class="history-stat-divider"></div>
+      <div class="history-stat">
+        <span class="history-stat-value">${minsDisplay}</span>
+        <span class="history-stat-label">min</span>
       </div>
     </div>
     ${activeExercises.map(ex => {
       const cals = estimateCals(ex.name, logs[ex.id]);
+      const mins = estimateMinutes(ex.name, logs[ex.id]);
+      const minsStr = mins < 1 ? '<1 min' : `~${Math.round(mins)} min`;
       return `
         <div class="history-item">
           <span class="history-icon">${ex.icon || '🏃'}</span>
           <div class="history-info">
             <span class="history-name">${ex.name}</span>
-            <span class="history-cals">~${cals} kcal</span>
+            <span class="history-cals">~${cals} kcal · ${minsStr}</span>
           </div>
           <span class="history-count has-reps">${logs[ex.id]}</span>
         </div>`;
