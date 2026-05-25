@@ -28,15 +28,18 @@ let userWeightKg = 74;
 // ---- Calorie estimation ----
 function getCalsPerRep(name) {
   const n = name.toLowerCase();
-  if (/flexion|push.?up|fondos|lagartija/.test(n)) return 0.35;
-  if (/sentadill|squat|cuclill/.test(n))           return 0.28;
-  if (/caminat|paso|walk|step/.test(n))            return 0.04;
-  if (/abdomin|sit.?up|crunch/.test(n))            return 0.25;
-  if (/burpee/.test(n))                            return 1.43;
-  if (/plancha|plank/.test(n))                     return 0.15;
-  if (/salto|jump|estoca/.test(n))                 return 0.50;
-  if (/corr|run|trote/.test(n))                    return 0.08;
-  return 0.30;
+  if (/flexion|push.?up|fondos|lagartija/.test(n))       return 0.35;
+  if (/sentadill|squat|cuclill/.test(n))                 return 0.32;
+  if (/estocad|lunge/.test(n))                           return 0.35;
+  if (/talon.*cola|cola.*talon|hamstring|curl/.test(n))  return 0.15;
+  if (/elevac.*talon|talon.*elevac|calf.?raise|pantorr/.test(n)) return 0.12;
+  if (/caminat|paso|walk|step/.test(n))                  return 0.04;
+  if (/abdomin|sit.?up|crunch/.test(n))                  return 0.25;
+  if (/burpee/.test(n))                                  return 1.43;
+  if (/plancha|plank/.test(n))                           return 0.15;
+  if (/salto|jump/.test(n))                              return 0.50;
+  if (/corr|run|trote/.test(n))                          return 0.08;
+  return 0.28;
 }
 
 function estimateCals(exerciseName, reps) {
